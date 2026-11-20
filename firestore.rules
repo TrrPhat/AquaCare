@@ -1,0 +1,435 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following Cloud Firestore data structures
+// for the AquaCare Flutter application (SDG 6 clean water, hydration & RO care):
+//
+// 1. Collection: users
+//    Document ID: {userId} (must match authenticated request.auth.uid)
+//    Access: Strictly private to the authenticated owner (no PII exposure).
+//    Supports partial writes via SetOptions(merge: true) on both create and update.
+//    Fields (all optional on partial merge, validated if present, max 50 keys):
+//      - uid / userId: string (optional, immutable, must equal userId if present)
+//      - userName / displayName / name: string (optional, 1..80 chars)
+//      - email: string (optional, valid email format, <= 120 chars)
+//      - photoUrl: string (optional, http(s) URL, <= 500 chars)
+//      - role: string or int (optional, UI AquaRole persona, never privileged admin)
+//      - bodyWeightKg: number (optional, 10..300)
+//      - selectedShift: string (optional, 1..120 chars)
+//      - waterSource: string (optional, 1..120 chars)
+//      - dailyGoalMl: int (optional, 500..6000)
+//      - intakeMl: int (optional, 0..10000)
+//      - selectedDrink: string (optional, 1..60 chars)
+//      - cupVolumeMl: number (optional, 50..2000)
+//      - caffeineMg: int (optional, 0..2000)
+//      - plasticSaved: int (optional, 0..100000)
+//      - streakDays: int (optional, 0..100000)
+//      - morningReminder / afternoonReminder / eveningReminder /
+//        watchSyncEnabled / tankCleanReminder / quizRewardClaimed: bool (optional)
+//      - drinkLogs: list (optional, <= 100 items)
+//      - dailyHistory / dailyHistoryMap: map (optional, <= 1096 entries)
+//      - tdsPpm: int (optional, 0..2000)
+//      - phLevel: number (optional, 0..14)
+//      - roFilterHealth: list (optional, <= 10 items)
+//      - roFilterMetrics / roMetrics / waterMetrics: map (optional, <= 20 entries)
+//      - waterTests: list (optional, <= 100 items)
+//      - selectedTechSlot: int (optional, 0..20)
+//      - bookings: list (optional, <= 50 items)
+//      - bills: list (optional, <= 100 items)
+//      - kidsCups: int (optional, 0..30)
+//      - kidsGoalCups: int (optional, 1..30)
+//      - kidsStars: int (optional, 0..1000000)
+//      - kidsSelectedQuizOption: int (optional, -1..20)
+//      - comicPageIndex: int (optional, 0..50)
+//      - equippedMascotItem: string (optional, <= 80 chars)
+//      - bottleStickers: list (optional, <= 50 items)
+//      - handwashSteps: list (optional, <= 10 items)
+//      - aquaKids / aquaKidsProgress: map (optional, <= 20 entries)
+//      - createdAt: timestamp (optional, immutable once set)
+//      - updatedAt: timestamp (optional)
+//
+// 2. Collection: community_stations
+//    Document ID: {stationId}
+//    Access: Public read (SDG 6 open refill station map data; contains no PII).
+//            Authenticated create (createdBy == request.auth.uid).
+//            Owner-only update and delete (resource.data.createdBy == request.auth.uid).
+//    Fields (max 20 keys):
+//      - createdBy: string (required, immutable, == request.auth.uid on create, 1..128 chars)
+//      - name: string (required, non-empty after trim, <= 120 chars)
+//      - tdsPpm: int (required, 0..500)
+//      - latitude: number (required, -90..90)
+//      - longitude: number (required, -180..180)
+//      - isFree: bool (required)
+//      - hasHotCold: bool (required)
+//      - isOpen24h: bool (required)
+//      - id: int or string (optional, >= 0 or 1..128 chars)
+//      - description: string (optional, <= 500 chars)
+//      - notes: string (optional, <= 300 chars)
+//      - address: string (optional, <= 240 chars)
+//      - district: string (optional, <= 100 chars)
+//      - city: string (optional, <= 100 chars)
+//      - rating: number (optional, 0..5)
+//      - ratingCount: int (optional, 0..1000000)
+//      - distanceMeters: int (optional, 0..200000)
+//      - xFactor / yFactor: number (optional, 0..1)
+//      - isUserProposed: bool (optional)
+//      - photoUrl: string (optional, http(s) URL, <= 500 chars)
+//      - createdAt: timestamp (optional, immutable once set)
+//      - updatedAt: timestamp (optional)
+//
+// 3. Collection: incidents
+//    Document ID: {incidentId}
+//    Access: Public read (nearby water outages/leaks visibility; contains no PII).
+//            Authenticated create (createdBy == request.auth.uid).
+//            Update by owner OR authenticated community upvote (+1 on upvotes only).
+//            Delete by owner only (resource.data.createdBy == request.auth.uid).
+//    Fields (max 15 keys):
+//      - createdBy: string (required, immutable, == request.auth.uid on create, 1..128 chars)
+//      - title: string (required, non-empty after trim, <= 240 chars)
+//      - severity: int (required, 0..2)
+//      - stationName: string (required, non-empty after trim, <= 120 chars)
+//      - upvotes: int (required, 1..1000000)
+//      - id: string (optional, 1..128 chars)
+//      - createdAtLabel: string (optional, <= 60 chars)
+//      - description: string (optional, <= 1000 chars)
+//      - status: string (optional, 1..60 chars)
+//      - stationId: int or string (optional, >= 0 or 1..128 chars)
+//      - latitude: number (optional, -90..90)
+//      - longitude: number (optional, -180..180)
+//      - createdAt: timestamp (optional, immutable once set)
+//      - updatedAt: timestamp (optional)
+//
+// 4. All other collections and subcollections are denied by default.
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request comes from an authenticated Firebase Auth user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the authenticated user owns the user-scoped document path
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if the authenticated user is the creator/owner stored on the existing doc
+    function isDocOwner() {
+      return isAuthenticated() && resource.data.createdBy == request.auth.uid;
+    }
+
+    // Verify UID field (if present) matches the authenticated user on create
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    // Ensure UID field (if set on existing doc) cannot be modified or removed on update
+    function uidNotModified() {
+      return !('uid' in resource.data) ||
+        (('uid' in request.resource.data) && request.resource.data.uid == resource.data.uid);
+    }
+
+    // Ensure a field, once set on the existing document, cannot be changed or deleted
+    function isImmutableFieldPreserved(field) {
+      return !(field in resource.data) ||
+        ((field in request.resource.data) && request.resource.data[field] == resource.data[field]);
+    }
+
+    // Validate required fields exist in the payload
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    // Validate document contains only explicitly allowed fields
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    // Validate non-empty trimmed string within length bounds
+    function isValidNonEmptyString(val, maxLen) {
+      return val is string && val.trim().size() > 0 && val.size() <= maxLen;
+    }
+
+    // Validate optional string (if present, must be string within [minLen, maxLen])
+    function isValidOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+        (data[field] is string &&
+         data[field].size() >= minLen &&
+         data[field].size() <= maxLen);
+    }
+
+    // Validate optional int within inclusive [minVal, maxVal]
+    function isValidOptionalInt(data, field, minVal, maxVal) {
+      return !(field in data) ||
+        (data[field] is int &&
+         data[field] >= minVal &&
+         data[field] <= maxVal);
+    }
+
+    // Validate optional number (int or float) within inclusive [minVal, maxVal]
+    function isValidOptionalNumber(data, field, minVal, maxVal) {
+      return !(field in data) ||
+        (data[field] is number &&
+         data[field] >= minVal &&
+         data[field] <= maxVal);
+    }
+
+    // Validate optional boolean
+    function isValidOptionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
+    }
+
+    // Validate optional list with bounded element count
+    function isValidOptionalList(data, field, maxSize) {
+      return !(field in data) || (data[field] is list && data[field].size() <= maxSize);
+    }
+
+    // Validate optional map with bounded key count
+    function isValidOptionalMap(data, field, maxKeys) {
+      return !(field in data) || (data[field] is map && data[field].keys().size() <= maxKeys);
+    }
+
+    // Validate optional Firestore timestamp
+    function isValidOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] is timestamp;
+    }
+
+    // Validate URL format (must start with https:// or http://)
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // Validate email format
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators (Called in both create and update)
+    // ===============================================================
+
+    // Validates users/{userId} payload while cleanly supporting partial SetOptions(merge: true)
+    function isValidUserDocument(userId, data) {
+      let forbiddenPrivilegeKeys = [
+        'isAdmin', 'admin', 'isModerator', 'moderator',
+        'roles', 'permissions', 'customClaims', 'claims'
+      ];
+      return data is map &&
+        data.keys().size() <= 50 &&
+        !data.keys().hasAny(forbiddenPrivilegeKeys) &&
+        // Identity & UI role checks (when present)
+        (!('uid' in data) || (data.uid is string && data.uid == userId)) &&
+        (!('userId' in data) || (data.userId is string && data.userId == userId)) &&
+        (!('role' in data) ||
+          (data.role is string && data.role in ['studentWorker', 'household', 'kids', 'SV / Đi làm', 'Hộ gia đình', 'Bé AquaKids']) ||
+          (data.role is int && data.role >= 0 && data.role <= 2)) &&
+        (!('email' in data) || (isValidEmail(data.email) && data.email.size() <= 120)) &&
+        (!('photoUrl' in data) || (isValidUrl(data.photoUrl) && data.photoUrl.size() <= 500)) &&
+        isValidOptionalString(data, 'userName', 1, 80) &&
+        isValidOptionalString(data, 'displayName', 1, 80) &&
+        isValidOptionalString(data, 'name', 1, 80) &&
+        // Hydration profile & onboarding
+        isValidOptionalInt(data, 'dailyGoalMl', 500, 6000) &&
+        isValidOptionalInt(data, 'intakeMl', 0, 10000) &&
+        isValidOptionalNumber(data, 'bodyWeightKg', 10, 300) &&
+        isValidOptionalString(data, 'selectedShift', 1, 120) &&
+        isValidOptionalString(data, 'waterSource', 1, 120) &&
+        isValidOptionalString(data, 'selectedDrink', 1, 60) &&
+        isValidOptionalNumber(data, 'cupVolumeMl', 50, 2000) &&
+        isValidOptionalInt(data, 'caffeineMg', 0, 2000) &&
+        isValidOptionalInt(data, 'plasticSaved', 0, 100000) &&
+        isValidOptionalInt(data, 'streakDays', 0, 100000) &&
+        isValidOptionalBool(data, 'morningReminder') &&
+        isValidOptionalBool(data, 'afternoonReminder') &&
+        isValidOptionalBool(data, 'eveningReminder') &&
+        isValidOptionalBool(data, 'watchSyncEnabled') &&
+        isValidOptionalList(data, 'drinkLogs', 100) &&
+        isValidOptionalMap(data, 'dailyHistory', 1096) &&
+        isValidOptionalMap(data, 'dailyHistoryMap', 1096) &&
+        // Household water quality, RO filters, bookings & bills
+        isValidOptionalInt(data, 'tdsPpm', 0, 2000) &&
+        isValidOptionalNumber(data, 'phLevel', 0, 14) &&
+        isValidOptionalList(data, 'roFilterHealth', 10) &&
+        isValidOptionalMap(data, 'roFilterMetrics', 20) &&
+        isValidOptionalMap(data, 'roMetrics', 20) &&
+        isValidOptionalMap(data, 'waterMetrics', 20) &&
+        isValidOptionalList(data, 'waterTests', 100) &&
+        isValidOptionalInt(data, 'selectedTechSlot', 0, 20) &&
+        isValidOptionalBool(data, 'tankCleanReminder') &&
+        isValidOptionalList(data, 'bookings', 50) &&
+        isValidOptionalList(data, 'bills', 100) &&
+        // AquaKids gamified progress
+        isValidOptionalInt(data, 'kidsCups', 0, 30) &&
+        isValidOptionalInt(data, 'kidsGoalCups', 1, 30) &&
+        isValidOptionalInt(data, 'kidsStars', 0, 1000000) &&
+        isValidOptionalInt(data, 'kidsSelectedQuizOption', -1, 20) &&
+        isValidOptionalBool(data, 'quizRewardClaimed') &&
+        isValidOptionalInt(data, 'comicPageIndex', 0, 50) &&
+        isValidOptionalString(data, 'equippedMascotItem', 0, 80) &&
+        isValidOptionalList(data, 'bottleStickers', 50) &&
+        isValidOptionalList(data, 'handwashSteps', 10) &&
+        isValidOptionalMap(data, 'aquaKids', 20) &&
+        isValidOptionalMap(data, 'aquaKidsProgress', 20) &&
+        // Timestamps
+        isValidOptionalTimestamp(data, 'createdAt') &&
+        isValidOptionalTimestamp(data, 'updatedAt');
+    }
+
+    // Validates community_stations/{stationId} schema, bounds, and types
+    function isValidStation(data) {
+      let requiredFields = [
+        'createdBy', 'name', 'tdsPpm', 'latitude', 'longitude',
+        'isFree', 'hasHotCold', 'isOpen24h'
+      ];
+      let allowedFields = [
+        'createdBy', 'name', 'tdsPpm', 'latitude', 'longitude',
+        'isFree', 'hasHotCold', 'isOpen24h',
+        'id', 'description', 'notes', 'address', 'district', 'city',
+        'rating', 'ratingCount', 'distanceMeters', 'xFactor', 'yFactor',
+        'isUserProposed', 'photoUrl', 'createdAt', 'updatedAt'
+      ];
+      return data is map &&
+        data.keys().size() <= 20 &&
+        hasRequiredFields(data, requiredFields) &&
+        hasOnlyAllowedFields(data, allowedFields) &&
+        data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() <= 128 &&
+        isValidNonEmptyString(data.name, 120) &&
+        data.tdsPpm is int && data.tdsPpm >= 0 && data.tdsPpm <= 500 &&
+        data.latitude is number && data.latitude >= -90 && data.latitude <= 90 &&
+        data.longitude is number && data.longitude >= -180 && data.longitude <= 180 &&
+        data.isFree is bool &&
+        data.hasHotCold is bool &&
+        data.isOpen24h is bool &&
+        (!('id' in data) ||
+          (data.id is int && data.id >= 0) ||
+          (data.id is string && data.id.size() > 0 && data.id.size() <= 128)) &&
+        isValidOptionalString(data, 'description', 0, 500) &&
+        isValidOptionalString(data, 'notes', 0, 300) &&
+        isValidOptionalString(data, 'address', 0, 240) &&
+        isValidOptionalString(data, 'district', 0, 100) &&
+        isValidOptionalString(data, 'city', 0, 100) &&
+        isValidOptionalNumber(data, 'rating', 0, 5) &&
+        isValidOptionalInt(data, 'ratingCount', 0, 1000000) &&
+        isValidOptionalInt(data, 'distanceMeters', 0, 200000) &&
+        isValidOptionalNumber(data, 'xFactor', 0, 1) &&
+        isValidOptionalNumber(data, 'yFactor', 0, 1) &&
+        isValidOptionalBool(data, 'isUserProposed') &&
+        (!('photoUrl' in data) || (isValidUrl(data.photoUrl) && data.photoUrl.size() <= 500)) &&
+        isValidOptionalTimestamp(data, 'createdAt') &&
+        isValidOptionalTimestamp(data, 'updatedAt');
+    }
+
+    // Validates incidents/{incidentId} schema, bounds, and types
+    function isValidIncident(data) {
+      let requiredFields = [
+        'createdBy', 'title', 'severity', 'stationName', 'upvotes'
+      ];
+      let allowedFields = [
+        'createdBy', 'title', 'severity', 'stationName', 'upvotes',
+        'id', 'createdAtLabel', 'description', 'status', 'stationId',
+        'latitude', 'longitude', 'createdAt', 'updatedAt'
+      ];
+      return data is map &&
+        data.keys().size() <= 15 &&
+        hasRequiredFields(data, requiredFields) &&
+        hasOnlyAllowedFields(data, allowedFields) &&
+        data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() <= 128 &&
+        isValidNonEmptyString(data.title, 240) &&
+        data.severity is int && data.severity >= 0 && data.severity <= 2 &&
+        isValidNonEmptyString(data.stationName, 120) &&
+        data.upvotes is int && data.upvotes >= 1 && data.upvotes <= 1000000 &&
+        isValidOptionalString(data, 'id', 1, 128) &&
+        isValidOptionalString(data, 'createdAtLabel', 0, 60) &&
+        isValidOptionalString(data, 'description', 0, 1000) &&
+        isValidOptionalString(data, 'status', 1, 60) &&
+        (!('stationId' in data) ||
+          (data.stationId is int && data.stationId >= 0) ||
+          (data.stationId is string && data.stationId.size() > 0 && data.stationId.size() <= 128)) &&
+        isValidOptionalNumber(data, 'latitude', -90, 90) &&
+        isValidOptionalNumber(data, 'longitude', -180, 180) &&
+        isValidOptionalTimestamp(data, 'createdAt') &&
+        isValidOptionalTimestamp(data, 'updatedAt');
+    }
+
+    // Owner update for incidents: full schema check + immutable creator/createdAt + prevent upvote inflation
+    function isValidIncidentOwnerUpdate() {
+      return isDocOwner() &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        isImmutableFieldPreserved('createdAt') &&
+        (request.resource.data.upvotes == resource.data.upvotes ||
+         request.resource.data.upvotes == resource.data.upvotes + 1) &&
+        isValidIncident(request.resource.data);
+    }
+
+    // Community upvote increment: authenticated user may only increment upvotes by exactly +1
+    function isValidIncidentUpvoteUpdate() {
+      return isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes']) &&
+        resource.data.upvotes is int &&
+        request.resource.data.upvotes is int &&
+        request.resource.data.upvotes == resource.data.upvotes + 1 &&
+        request.resource.data.upvotes <= 1000000;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Private per-user profile, hydration state, RO metrics, bookings, bills, and AquaKids progress
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        uidUnchanged() &&
+        isValidUserDocument(userId, request.resource.data);
+      allow update: if isOwner(userId) &&
+        uidNotModified() &&
+        isImmutableFieldPreserved('userId') &&
+        isImmutableFieldPreserved('createdAt') &&
+        isValidUserDocument(userId, request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    // 2. Public SDG 6 community clean-water refill stations
+    match /community_stations/{stationId} {
+      // Explicitly public open data for nearby refill station map
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        isValidStation(request.resource.data);
+      allow update: if isDocOwner() &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        isImmutableFieldPreserved('createdAt') &&
+        isValidStation(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    // 3. Public water outage / leak incident reports with community +1 upvote
+    match /incidents/{incidentId} {
+      // Explicitly public read so nearby water outages/leaks are visible
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        request.resource.data.createdBy == request.auth.uid &&
+        isValidIncident(request.resource.data);
+      allow update: if isValidIncidentOwnerUpdate() || isValidIncidentUpvoteUpdate();
+      allow delete: if isDocOwner();
+    }
+
+    // 4. Default deny all other paths and subcollections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

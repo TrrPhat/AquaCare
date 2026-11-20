@@ -1,0 +1,17 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="AppIcon_Large" clip-path="url(#clip0_0_82)">
+<path id="Vector" d="M122 0H38C17.0132 0 0 17.0132 0 38V122C0 142.987 17.0132 160 38 160H122C142.987 160 160 142.987 160 122V38C160 17.0132 142.987 0 122 0Z" fill="#0284C7"/>
+<path id="Vector_2" d="M0 108C26.6667 97.3333 53.3333 97.3333 80 108C106.667 118.667 133.333 118.667 160 108V160H0V108Z" fill="#00B4D8"/>
+<path id="Vector_3" d="M80 26C80 26 126 76 126 106C126 131 105 150 80 150C55 150 34 131 34 106C34 76 80 26 80 26Z" fill="white"/>
+<path id="Vector_4" d="M80 42C80 42 114 81 114 104C114 123 99 138 80 138C61 138 46 123 46 104C46 81 80 42 80 42Z" fill="#E0F4FF"/>
+<path id="Vector_5" d="M67 107C69.7614 107 72 104.761 72 102C72 99.2386 69.7614 97 67 97C64.2386 97 62 99.2386 62 102C62 104.761 64.2386 107 67 107Z" fill="#0B2545"/>
+<path id="Vector_6" d="M93 107C95.7614 107 98 104.761 98 102C98 99.2386 95.7614 97 93 97C90.2386 97 88 99.2386 88 102C88 104.761 90.2386 107 93 107Z" fill="#0B2545"/>
+<path id="Vector_7" d="M72 113C77.3333 118.333 82.6667 118.333 88 113" stroke-width="4" stroke-linecap="round" stroke="#0B2545"/>
+<path id="Vector_8" d="M80 65C80 52 94 46 103 48C101 58 92 65 80 65Z" fill="#10B981"/>
+</g>
+<defs>
+<clipPath id="clip0_0_82">
+<rect width="160" height="160" fill="white"/>
+</clipPath>
+</defs>
+</svg>

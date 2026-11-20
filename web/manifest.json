@@ -1,0 +1,35 @@
+{
+    "name": "AquaCare – Nước sạch & Sức khỏe",
+    "short_name": "AquaCare",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F4F9FD",
+    "theme_color": "#5DCCFC",
+    "description": "Ứng dụng cấp ẩm thông minh, quản lý lõi lọc RO, Bé AquaKids và bản đồ trạm nước sạch SDG 6.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

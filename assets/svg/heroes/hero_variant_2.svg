@@ -1,0 +1,21 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="335" height="150" viewBox="0 0 335 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Frame" clip-path="url(#clip0_0_80)">
+<path id="Vector" d="M313 0H22C9.84974 0 0 9.84974 0 22V128C0 140.15 9.84974 150 22 150H313C325.15 150 335 140.15 335 128V22C335 9.84974 325.15 0 313 0Z" fill="#EAF7FF"/>
+<path id="Vector_2" d="M78 129C107.823 129 132 104.823 132 75C132 45.1766 107.823 21 78 21C48.1766 21 24 45.1766 24 75C24 104.823 48.1766 129 78 129Z" fill="white" stroke-width="6" stroke="#BAE6FD"/>
+<path id="Vector_3" d="M27 72C43.6667 64 60.6667 64 78 72C95.3333 80 112.333 80 129 72C129 85.526 123.627 98.4981 114.062 108.062C104.498 117.627 91.526 123 78 123C64.474 123 51.5019 117.627 41.9376 108.062C32.3732 98.4981 27 85.526 27 72Z" fill="#5DCCFC"/>
+<path id="Vector_4" d="M97 92H59C56.2386 92 54 94.2386 54 97C54 99.7614 56.2386 102 59 102H97C99.7614 102 102 99.7614 102 97C102 94.2386 99.7614 92 97 92Z" fill="white"/>
+<path id="Vector_5" d="M302 14H170C160.059 14 152 22.0589 152 32V118C152 127.941 160.059 136 170 136H302C311.941 136 320 127.941 320 118V32C320 22.0589 311.941 14 302 14Z" fill="white"/>
+<path id="Vector_6" d="M176 32H192" stroke-width="2" stroke-linecap="round" stroke="#141A1E"/>
+<path id="Vector_7" d="M176 50H192" stroke-width="2.5" stroke-linecap="round" stroke="#3BB8ED"/>
+<path id="Vector_8" d="M176 68H192" stroke-width="2" stroke-linecap="round" stroke="#141A1E"/>
+<path id="Vector_9" d="M176 86H192" stroke-width="2" stroke-linecap="round" stroke="#141A1E"/>
+<path id="Vector_10" d="M176 104H192" stroke-width="2" stroke-linecap="round" stroke="#141A1E"/>
+<path id="Vector_11" d="M206 26L214 116C215 121 219 124 224 124H268C273 124 277 121 278 116L286 26H206Z" fill="#EAF7FF" stroke-width="2.5" stroke="#BAE6FD"/>
+<path id="Vector_12" d="M210 54C234 48.6667 258 48.6667 282 54L276 114C275 118 272 121 268 121H224C220 121 217 118 216 114L210 54Z" fill="#5DCCFC"/>
+</g>
+<defs>
+<clipPath id="clip0_0_80">
+<rect width="335" height="150" fill="white"/>
+</clipPath>
+</defs>
+</svg>
